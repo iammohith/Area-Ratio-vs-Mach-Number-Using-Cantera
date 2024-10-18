@@ -3,12 +3,12 @@
 """
 Created on Mon Apr 20 13:21:16 2020
 
-@author: mohith_sai
-"""
+Author: Mohith Sai
 
-
-"""
-Isentropic, adiabatic flow example - calculate area ratio vs. Mach number curve
+Description:
+This script calculates the area ratio versus Mach number curve for 
+isentropic, adiabatic flow using Cantera. It allows for the analysis 
+of different gas mixtures or defaults to a hydrogen/nitrogen mixture.
 """
 
 import cantera as ct
@@ -17,64 +17,69 @@ import numpy as np
 
 
 def soundspeed(gas):
-    """The speed of sound. Assumes an ideal gas."""
-
-    gamma = gas.cp / gas.cv
-    return math.sqrt(gamma * ct.gas_constant
-                     * gas.T / gas.mean_molecular_weight)
+    """Calculate the speed of sound in an ideal gas."""
+    gamma = gas.cp / gas.cv  # Heat capacity ratio
+    return math.sqrt(gamma * ct.gas_constant * gas.T / gas.mean_molecular_weight)
 
 
 def isentropic(gas=None):
     """
-    In this example, the area ratio vs. Mach number curve is computed. If a gas
-    object is supplied, it will be used for the calculations, with the
-    stagnation state given by the input gas state. Otherwise, the calculations
-    will be done for a 10:1 hydrogen/nitrogen mixture with stagnation T0 = 1200
-    K, P0 = 10 atm.
+    Compute the area ratio vs. Mach number curve.
+
+    If a gas object is provided, it will be used for calculations 
+    with the stagnation state defined by the gas's state. If no gas 
+    is provided, calculations are performed for a hydrogen/nitrogen 
+    mixture with a stagnation temperature of 1200 K and a pressure of 10 atm.
+    
+    Returns:
+        np.ndarray: An array containing the area ratios, Mach numbers, 
+                    temperatures, and pressure ratios.
     """
     if gas is None:
-        gas = ct.Solution('gri30.xml')
-        gas.TPX = 1200.0, 10.0*ct.one_atm, 'H2:1,N2:0.1'
+        gas = ct.Solution('gri30.yaml')  # Default gas mixture in YAML format
+        gas.TPX = 1200.0, 10.0 * ct.one_atm, 'H2:1,N2:0.1'
 
-    # get the stagnation state parameters
-    s0 = gas.s
-    h0 = gas.h
-    p0 = gas.P
+    # Get the stagnation state parameters
+    s0 = gas.s  # Entropy
+    h0 = gas.h  # Enthalpy
+    p0 = gas.P  # Pressure
 
-    mdot = 1  # arbitrary
-    amin = 1.e14
+    mdot = 1  # Mass flow rate (arbitrary)
+    amin = 1.e14  # Minimum area initialized to a large number
 
-    data = np.zeros((200,4))
+    # Initialize an array to store data for plotting
+    data = np.zeros((200, 4))
 
-    # compute values for a range of pressure ratios
+    # Compute values for a range of pressure ratios
     for r in range(200):
+        p = p0 * (r + 1) / 201.0  # Current pressure
+        gas.SP = s0, p  # Set the state using (entropy, pressure)
 
-        p = p0*(r+1)/201.0
-        # set the state using (p,s0)
-        gas.SP = s0, p
+        v2 = 2.0 * (h0 - gas.h)  # Calculate velocity from enthalpy difference
+        v = math.sqrt(v2)  # Velocity
+        area = mdot / (gas.density * v)  # Area calculation
+        amin = min(amin, area)  # Update minimum area
+        data[r, :] = [area, v / soundspeed(gas), gas.T, p / p0]  # Store results
 
-        v2 = 2.0*(h0 - gas.h)      # h + V^2/2 = h0
-        v = math.sqrt(v2)
-        area = mdot/(gas.density*v)    # rho*v*A = constant
-        amin = min(amin, area)
-        data[r,:] = [area, v/soundspeed(gas), gas.T, p/p0]
-
-    data[:,0] /= amin
+    data[:, 0] /= amin  # Normalize area ratios
 
     return data
 
 
 if __name__ == "__main__":
-    print(isentropic.__doc__)
-    data = isentropic()
+    print(isentropic.__doc__)  # Print documentation for the isentropic function
+    data = isentropic()  # Perform the calculations
+
     try:
-        import matplotlib.pyplot as plt
-        plt.plot(data[:,1], data[:,0])
+        import matplotlib.pyplot as plt  # Import matplotlib for plotting
+        plt.plot(data[:, 1], data[:, 0])  # Plot area ratio vs. Mach number
         plt.ylabel('Area Ratio')
         plt.xlabel('Mach Number')
         plt.title('Isentropic Flow: Area Ratio vs. Mach Number')
-        plt.show()
+        plt.grid()  # Add grid for better readability
+        plt.show()  # Show the plot
 
     except ImportError:
-        print('area ratio,   Mach number,   temperature,   pressure ratio')
+        # Fallback for environments without matplotlib
+        print('Area Ratio, Mach Number, Temperature, Pressure Ratio:')
         print(data)
